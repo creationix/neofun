@@ -1,0 +1,44 @@
+; Our strip has 60 pixels
+(length= 60)
+; They expect data in green-red-blue order
+(type= grb)
+; run an animation frame every 33 ms (~30fps)
+(delay= 33)
+
+; Spawn 4 crawling bug sprites
+(spawn 4
+  ; Random starting position
+  (p= (rand length))
+  ; Random starting hue
+  (h= (rand 768))
+  ; Semi-random lifetime
+  (l= (rand 50 100))
+
+  ; ready separates initialization code with update code that's run once
+  ; per update cycle
+  (ready)
+
+  ; Move 1 pixel forward
+  (p% 1 length)
+  ; Slightly change hue
+  (h% 7 768)
+  ; Draw new position
+  (hue p h 2)
+  ; Decrement lifetime.
+  (if (l% -1)
+    ; If lifetime reached zero, draw explosion.
+    ; loop from zero to 14
+    (for (i 0 14)
+      ; draw gradient that color shifts while fading away.
+      (hue (+ p i) h (/ i 2))
+      (hue (- p i) h (/ i 2))
+      (h% 27 768)
+    )
+    ; restart the sprite with new random values.
+    (respawn)
+  )
+)
+
+; Fade the entire scene every frame.
+(ready)
+(fade 1)

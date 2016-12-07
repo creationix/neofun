@@ -1,0 +1,8 @@
+(h= 0)
+(p= 0)
+
+(ready)
+
+(hue p h)
+(p% 1 length)
+(h% 13 768)
