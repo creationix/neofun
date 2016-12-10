@@ -6,36 +6,38 @@ fizz = 3    // How many sprites to update per animation loop (defaults to all)
 
 // This is called once per animation loop before updating sprites.
 loop {
-  fade(20)
+  fade(20, 1, 2, 3)
+  fade()
+  fade(1)
 }
 
 // This is called for each sprite when it's spawned.
 // Variables created here are local to the sprite.
 spawn {
-  p:length = rand   // Random starting position
-  // h:768 = rand      // Random starting hue
-  // l = rand(50) + 50 // Semi-random lifetime
+  p:length = rand()   // Random starting position
+  h:768 = rand()      // Random starting hue
+  l = rand(50) + 50 // Semi-random lifetime
 }
 
-// // This is called once per sprite update
-// // you can access global variables as well as sprite local variables.
-// update {
-//   p += 1         // Move 1 pixel forward
-//   h += 7         // Slightly change hue
-//   hue(p, h, 100) // Draw new position
-//   l -= 1         // Decrement lifetime.
-//   if l <= 0 {
-//     explode      // When lifetime reaches zero, explode!
-//   }
-// }
-//
-// // draw gradient that color shifts while fading away.
-// explode {
-//   b = 255
-//   loop i:14 {
-//     b -= 18
-//     hue(p + i, h, b)
-//     hue(p - i, h, b)
-//   }
-//   respawn // And then restart the sprite.
-// }
+// This is called once per sprite update
+// you can access global variables as well as sprite local variables.
+update {
+  p += 1         // Move 1 pixel forward
+  h += 7         // Slightly change hue
+  hue(p, h, 100) // Draw new position
+  l -= 1         // Decrement lifetime.
+  if l <= 0 {
+    explode()    // When lifetime reaches zero, explode!
+  }
+}
+
+// draw gradient that color shifts while fading away.
+explode {
+  b = 255
+  // loop i:14 {
+  //   b -= 18
+  //   hue(p + i, h, b)
+  //   hue(p - i, h, b)
+  // }
+  respawn() // And then restart the sprite.
+}

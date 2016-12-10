@@ -5,6 +5,6 @@ function stripComments(code) {
   return code.replace(/\/\/[^\r\n]*/g, "");
 }
 code = stripComments(code);
-
+console.log(inspect(code, {colors:true}))
 var tree = parse(code);
 console.log(inspect(tree, {depth:null,colors:true}));
