@@ -24,15 +24,33 @@ block
   = "{" _ c:code? _ "}" { return c || [] }
 
 code
-  = head:statement tail:(__ statement)* { return list(head, tail, 1) }
+  = head:statement tail:(_ statement)* {
+      return list(head, tail, 1)
+    }
 
 ident
-  = letters:([a-z][a-z0-9]*) { return letters[0] + letters[1].join("") }
+  = letters:([a-z][a-z0-9]*) {
+      return letters[0] + letters[1].join("");
+    }
+
+
+IdentifierPart = [a-zA-Z]
+
+Keyword
+  = IfToken
+  / ElfToken
+  / ElseToken
+  / LoopToken
+
+IfToken    = "if"      !IdentifierPart
+ElfToken   = "elf"     !IdentifierPart
+ElseToken  = "else"    !IdentifierPart
+LoopToken  = "loop"    !IdentifierPart
 
 statement
-  = "if" _ e:expression _ b:block
-    elves:( _ "elf" _ expression _ block)*
-    last:( _ "else" _ block)? {
+  = IfToken _ e:expression _ b:block
+    elves:( _ ElfToken _ expression _ block)*
+    last:( _ ElseToken _ block)? {
       var list = ["IF", e, b];
       if (elves) {
         elves.forEach(function (elf) {
@@ -44,20 +62,25 @@ statement
       }
       return list;
     }
+  / LoopToken _ name:(ident ":")? count:integer _ b:block {
+      return name ?
+        ["LOOP", count, b, name[0]] :
+        ["LOOP", count, b]
+      }
   / expression
 
 
 expression = e1
 
 e1
-  = i:ident t:(":" length)? _ "=" _ v:e1 {
-      return t ? ["ASSIGN", i, v, t[1]] : ["ASSIGN", i, v]
+  = i:ident _ "=" _ v:e1 {
+      return ["ASSIGN", i, v]
     }
-  / i:ident _ "+=" _ v:e1 {
-      return ["INCR", i, v]
+  / i:ident t:(":" length)? _ "+=" _ v:e1 {
+      return t ? ["INCRMOD", i, v, t[1]] : ["INCR", i, v]
     }
-  / i:ident _ "-=" _ v:e1 {
-      return ["DECR", i, v]
+  / i:ident t:(":" length)? _ "-=" _ v:e1 {
+      return t ? ["DECRMOD", i, v, t[1]] : ["DECR", i, v]
     }
   / e2
 
@@ -128,18 +151,18 @@ e8
 
 e9
   = "(" _ e:e1 _ ")" { return e }
-  / Integer
+  / integer
   / Call
   / Variable
 
-Integer
+integer
   = digits:([-+]?[0-9]+) {
       return parseInt((digits[0]||"") + digits[1].join(""), 10)
     }
 
 length
   = Variable
-  / Integer
+  / integer
 
 Variable
   = i:ident { return i }
@@ -153,7 +176,10 @@ args
     }
 
 // optional whitespace
-_ = [ \t\r\n]* { return }
-
+_ = empty* { return }
 // mandatory whitespace
-__ = [ \t\r\n]+ { return }
+__ = empty+ { return }
+
+empty
+  = [ \t\r\n]+
+  / "//" [^\r\n]*

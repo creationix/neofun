@@ -3,114 +3,88 @@
 #include <stdint.h>
 #include <unistd.h>
 
+
 typedef enum opcode {
-  // global config overrides
-  LENGTH = 128, // Reallocate space and set pixel count
-  TYPE, // Configure pixel type
-  DELAY, // Set update loop delay in ms
-  // Basic math opcodes
-  ADD, // a + b
-  SUB, // a - b
-  MUL, // a * b
-  DIV, // a / b
-  MOD, // a % b
-  NEG, // -a
-  // Comparison
-  EQ, NEQ, GT, GTE, LT, LTE, // a op b
-  // Logic
-  AND, OR, XOR, // a op b
-  NOT, // !a
+  // 0 - 127 number literals
+  // 0msxxxxx mxxxxxxx
+  // `m` is more flag, `s` is sign, `x`s are variable length value.
+  GGET = 128, // 16 global gets
+  SGET = 144, // 16 sprite gets
+  GSET = 160, // 16 global sets
+  SSET = 176, // 16 sprite sets
+  GMOD = 192,
+  SMOD = 208,
+  // Global configuration
+  CONFIG = 224, // (length, bpp, delay, sprites, fizz)
   // Library functions
   FADE, // fade(d)
-  RAND, // rand(a, b)
+  RAND, // rand()
   HUE, // hue(p, h, d)
   RGB, // rgb(p, r, g, b)
   RGBW, // rgbw(p, r, g, b, w)
+
+  // Core language
+  ADD, SUB, MUL, DIV, MOD, NEG, // Arithmetic
+  EQ, NEQ, GT, GTE, LT, LTE, // Comparison
+  AND, OR, XOR, NOT, // Logic
   // Control flow
   IF, // if (cond) body...
-  ELIF, // elif (cond) body...
+  ELF, // elf (cond) body...
   ELSE, // else body...
-  FOR, // for (name start end step)
-  // Variable management
-  SET, // set name value
-  GET, // get name
-  // Variable mutation ops
-  INCRMOD, // incrmod name delta limit
-  DECR, // decrease by one -> returns true if zero is hit
-  // Concurrency management
-  SPAWN, // spawn count body...
-  READY, // set loop pointer to next instruction
+  LOOP, // for (name start end step)
+  END, // end for conditional or loop block
+  GOSUB, // call subroutine
+  RETURN, // return from subroutine
   RESPAWN, // start over current sprite
-  DIE, // end current sprite
+  RESTART, // re-run global setup function and reset sprites.
+  RAW, // offset, length, bytes
 } opcode_t;
 
-typedef struct sprite {
-  struct sprite *next; // optional pointer to previous sprite in linked list
-  struct sprite *prev; // optional pointer to next sprite
-  uint8_t *start; // pointer to start of sprite setup code
-  uint8_t *loop; // pointer to start of sprite loop code
-  int variables[]; // local variables
-} sprite_t;
+uint8_t* code = (uint8_t[]){
+  // length = 60 // Our strip has 60 LEDs
+  // bpp = 3     // We are using normal ws2812b lights that expect 3 bytes of color.
+  // delay = 33  // Delay between animation loops in ms (defaults to 100)
+  // sprites = 4 // Total number of sprites to spawn at startup
+  // fizz = 3    // How many sprites to update per animation loop (defaults to all)
+  60, 3, 33, 4, 3, CONFIG,
 
-typedef struct state {
-  sprite_t *first_sprite; // pointer to linked list of sprites
-  sprite_t *sprite; // optional pointer if running in sprite;
-  uint8_t *next; // pointer to next instruction
-  uint8_t *start; // pointer to start of setup code
-  uint8_t *loop; // pointer to start of loop code
-  int num_globals; // number of global variable slots.
-  int variables[]; // global variables
-} state_t;
+  // // This is called once per animation loop before updating sprites.
+  // loop {
+  //   fade(1)
+  1, FADE,
+  RETURN,
+  // }
+  //
+  // // This is called for each sprite when it's spawned.
+  // // Variables created here are local to the sprite.
+  // spawn {
 
-int eval(state_t *S) {
-  if (*S->next < 128) {
-    // TODO: handle numbers larger than 127
-    return *S->next++;
-  }
-  switch ((opcode_t)*S->next++) {
-
-  }
-}
-
-
-#define MAX_TOKEN_LENGTH 64
-
-int main() {
-  char ch;
-  char buffer[MAX_TOKEN_LENGTH];
-  int len = 0;
-  int stack = 0;
-  bool comment = true;
-  while (read(0, &ch, 1) > 0) {
-    if (comment) {
-      if (ch != '\n') continue;
-      comment = false;
-    }
-    if (!(ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' ||
-          ch == ')' || ch == '(' || ch == ';')) {
-      if (len < MAX_TOKEN_LENGTH) buffer[len++] = ch;
-      continue;
-    }
-    if (len) {
-      for (int i = 0; i < stack; i++) printf(" ");
-      printf("'%.*s'\n", len, buffer);
-      len = 0;
-    }
-    if (ch == '(') {
-      stack++;
-      continue;
-    }
-    if (ch == ')') {
-      stack--;
-      printf("\n");
-      continue;
-    }
-    if (ch == ';') {
-      comment = 1;
-      continue;
-    }
-  }
-  if (len) {
-    printf("'%.*s'\n", len, buffer);
-  }
-}
+  //   p:length = rand()   // Random starting position
+  //   h:768 = rand()      // Random starting hue
+  //   l = rand(50) + 50   // Semi-random lifetime
+  //   r = rand(2) * 2 - 1 // Random direction
+  // }
+  //
+  // // This is called once per sprite update
+  // // you can access global variables as well as sprite local variables.
+  // update {
+  //   p += 1         // Move 1 pixel forward
+  //   h += 7         // Slightly change hue
+  //   hue(p, h, 100) // Draw new position
+  //   l -= 1         // Decrement lifetime.
+  //   if l <= 0 {
+  //     explode()    // When lifetime reaches zero, explode!
+  //   }
+  // }
+  //
+  // // draw gradient that color shifts while fading away.
+  // explode {
+  //   b = 255
+  //   loop i:14 {
+  //     b -= 18
+  //     hue(p + i, h, b)
+  //     hue(p - i, h, b)
+  //   }
+  //   respawn() // And then restart the sprite.
+  // }
+};
