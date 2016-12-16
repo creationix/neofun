@@ -141,17 +141,17 @@ function peg$parse(input, options) {
       peg$startRuleFunctions = { start: peg$parsestart },
       peg$startRuleFunction  = peg$parsestart,
 
-      peg$c0 = function(program) { return program },
+      peg$c0 = function(program) { return new Program(program || []) },
       peg$c1 = function(head, tail) { return list(head, tail, 1) },
       peg$c2 = "=",
       peg$c3 = peg$literalExpectation("=", false),
-      peg$c4 = function(i, e) { return ["CONF", i, e] },
-      peg$c5 = function(i, b) { return ["FUNC", i].concat(b) },
+      peg$c4 = function(i, e) { return new Conf(i, e); },
+      peg$c5 = function(i, b) { return new Func(i, b); },
       peg$c6 = "{",
       peg$c7 = peg$literalExpectation("{", false),
       peg$c8 = "}",
       peg$c9 = peg$literalExpectation("}", false),
-      peg$c10 = function(c) { return c || [] },
+      peg$c10 = function(c) { return new Block(c || []) },
       peg$c11 = function(head, tail) {
             return list(head, tail, 1)
           },
@@ -172,112 +172,107 @@ function peg$parse(input, options) {
       peg$c24 = peg$literalExpectation("else", false),
       peg$c25 = "loop",
       peg$c26 = peg$literalExpectation("loop", false),
-      peg$c27 = function(e, b, elves, last) {
-            var list = ["IF", e, b];
-            if (elves) {
-              elves.forEach(function (elf) {
-                list.push(elf[3], elf[5]);
+      peg$c27 = function(e, b, el, last) {
+            var elves = [[e, b]];
+            if (el) {
+              el.forEach(function (elf) {
+                elves.push([elf[3], elf[5]]);
               });
             }
-            if (last) {
-              list.push(1, last[3])
-            }
-            return list;
+            return new If(elves, last && last[3]);
           },
       peg$c28 = ":",
       peg$c29 = peg$literalExpectation(":", false),
       peg$c30 = function(name, count, b) {
-            return name ?
-              ["LOOP", count, b, name[0]] :
-              ["LOOP", count, b]
-            },
+            return new Loop(name && name[0], count, b);
+          },
       peg$c31 = function(i, v) {
-            return ["ASSIGN", i, v]
+            return new Assign(i, v);
           },
       peg$c32 = "+=",
       peg$c33 = peg$literalExpectation("+=", false),
       peg$c34 = function(i, t, v) {
-            return t ? ["INCRMOD", i, v, t[1]] : ["INCR", i, v]
+            return new Mut(i, "ADD", v, t && t[1]);
           },
       peg$c35 = "-=",
       peg$c36 = peg$literalExpectation("-=", false),
       peg$c37 = function(i, t, v) {
-            return t ? ["DECRMOD", i, v, t[1]] : ["DECR", i, v]
+            return new Mut(i, "SUB", v, t && t[1]);
           },
       peg$c38 = "or",
       peg$c39 = peg$literalExpectation("or", false),
       peg$c40 = function(left, right) {
-            return ["OR", left, right]
+            return new Binop("OR", left, right);
           },
       peg$c41 = "xor",
       peg$c42 = peg$literalExpectation("xor", false),
       peg$c43 = function(left, right) {
-            return ["XOR", left, right]
+            return new Binop("XOR", left, right);
           },
       peg$c44 = "and",
       peg$c45 = peg$literalExpectation("and", false),
       peg$c46 = function(left, right) {
-            return ["AND", left, right]
+            return new Binop("AND", left, right);
           },
       peg$c47 = "==",
       peg$c48 = peg$literalExpectation("==", false),
       peg$c49 = function(left, right) {
-            return ["EQ", left, right]
+            return new Binop("EQ", left, right);
           },
       peg$c50 = "!=",
       peg$c51 = peg$literalExpectation("!=", false),
       peg$c52 = function(left, right) {
-            return ["NEQ", left, right]
+            return new Binop("NEQ", left, right);
           },
       peg$c53 = "<",
       peg$c54 = peg$literalExpectation("<", false),
       peg$c55 = function(left, right) {
-            return ["LT", left, right]
+            return new Binop("LT", left, right);
           },
       peg$c56 = "<=",
       peg$c57 = peg$literalExpectation("<=", false),
       peg$c58 = function(left, right) {
-            return ["LTE", left, right]
+            return new Binop("LTE", left, right);
           },
       peg$c59 = ">",
       peg$c60 = peg$literalExpectation(">", false),
       peg$c61 = function(left, right) {
-            return ["GT", left, right]
+            return new Binop("GT", left, right);
           },
       peg$c62 = ">=",
       peg$c63 = peg$literalExpectation(">=", false),
       peg$c64 = function(left, right) {
-            return ["GTE", left, right]
+            return new Binop("GTE", left, right);
           },
       peg$c65 = "+",
       peg$c66 = peg$literalExpectation("+", false),
       peg$c67 = function(left, right) {
-            return ["ADD", left, right]
+            return new Binop("ADD", left, right);
           },
       peg$c68 = "-",
       peg$c69 = peg$literalExpectation("-", false),
       peg$c70 = function(left, right) {
-            return ["SUB", left, right]
+            return new Binop("SUB", left, right);
           },
       peg$c71 = "*",
       peg$c72 = peg$literalExpectation("*", false),
       peg$c73 = function(left, right) {
-            return ["MUL", left, right]
+            return new Binop("MUL", left, right);
           },
       peg$c74 = "/",
       peg$c75 = peg$literalExpectation("/", false),
       peg$c76 = function(left, right) {
-            return ["DIV", left, right]
+            return new Binop("DIV", left, right);
           },
       peg$c77 = "%",
       peg$c78 = peg$literalExpectation("%", false),
       peg$c79 = function(left, right) {
-            return ["MOD", left, right]
+            return new Binop("MOD", left, right);
           },
-      peg$c80 = function(right) { return ["NEG", right] },
+      peg$c80 = function(right) { return new Unop("NEG", right) },
       peg$c81 = "not",
       peg$c82 = peg$literalExpectation("not", false),
-      peg$c83 = function(right) { return ["NOT"], right },
+      peg$c83 = function(right) { return new Unop("NOT", right) },
       peg$c84 = "(",
       peg$c85 = peg$literalExpectation("(", false),
       peg$c86 = ")",
@@ -288,10 +283,12 @@ function peg$parse(input, options) {
       peg$c91 = /^[0-9]/,
       peg$c92 = peg$classExpectation([["0", "9"]], false, false),
       peg$c93 = function(digits) {
-            return parseInt((digits[0]||"") + digits[1].join(""), 10)
+            return new Integer(parseInt((digits[0]||"") + digits[1].join(""), 10))
           },
-      peg$c94 = function(i) { return i },
-      peg$c95 = function(i, a) { return ["CALL", i].concat(a || []) },
+      peg$c94 = function(i) { return new Variable(i) },
+      peg$c95 = function(i, a) {
+            return new Call(i, a || []);
+          },
       peg$c96 = ",",
       peg$c97 = peg$literalExpectation(",", false),
       peg$c98 = function(head, tail) {
@@ -602,7 +599,7 @@ function peg$parse(input, options) {
         if (s3 !== peg$FAILED) {
           s4 = peg$parse_();
           if (s4 !== peg$FAILED) {
-            s5 = peg$parsee2();
+            s5 = peg$parseInteger();
             if (s5 !== peg$FAILED) {
               peg$savedPos = s0;
               s1 = peg$c4(s1, s5);
@@ -1313,7 +1310,7 @@ function peg$parse(input, options) {
             s3 = null;
           }
           if (s3 !== peg$FAILED) {
-            s4 = peg$parseinteger();
+            s4 = peg$parseInteger();
             if (s4 !== peg$FAILED) {
               s5 = peg$parse_();
               if (s5 !== peg$FAILED) {
@@ -2380,7 +2377,7 @@ function peg$parse(input, options) {
       s0 = peg$FAILED;
     }
     if (s0 === peg$FAILED) {
-      s0 = peg$parseinteger();
+      s0 = peg$parseInteger();
       if (s0 === peg$FAILED) {
         s0 = peg$parseCall();
         if (s0 === peg$FAILED) {
@@ -2394,7 +2391,7 @@ function peg$parse(input, options) {
     return s0;
   }
 
-  function peg$parseinteger() {
+  function peg$parseInteger() {
     var s0, s1, s2, s3, s4;
 
     var key    = peg$currPos * 31 + 23,
@@ -2477,7 +2474,7 @@ function peg$parse(input, options) {
 
     s0 = peg$parseVariable();
     if (s0 === peg$FAILED) {
-      s0 = peg$parseinteger();
+      s0 = peg$parseInteger();
     }
 
     peg$resultsCache[key] = { nextPos: peg$currPos, result: s0 };
@@ -2836,6 +2833,253 @@ function peg$parse(input, options) {
     return s0;
   }
 
+
+    var conf = {};
+    var funcs = {};
+    var code;
+    var locals = [];
+    var native = [];
+
+    function varSlot(name) {
+      if (name in conf || name in funcs) {
+        throw new Error("name is taken: " + name);
+      }
+      var index = locals.indexOf(name);
+      if (index >= 0) return index;
+      index = locals.length;
+      locals[index] = name;
+      return index;
+    }
+    function fnSlot(name) {
+      if (name in conf || name in funcs) {
+        throw new Error("name is taken: " + name);
+      }
+      var index = native.indexOf(name);
+      if (index >= 0) return index;
+      index = native.length;
+      native[index] = name;
+      return index;
+    }
+
+    var OPS = [
+      "SET0",  "SET1",  "SET2",  "SET3",  "SET4",  "SET5",  "SET6",  "SET7",
+      "SET8",  "SET9",  "SET10", "SET11", "SET12", "SET13", "SET14", "SET15",
+      "GET0",  "GET1",  "GET2",  "GET3",  "GET4",  "GET5",  "GET6",  "GET7",
+      "GET8",  "GET9",  "GET10", "GET11", "GET12", "GET13", "GET14", "GET15",
+      "CALL0",  "CALL1",  "CALL2",  "CALL3",  "CALL4",  "CALL5",  "CALL6",  "CALL7",
+      "SETN", "GETN", "CALLN",
+      "INCR", "DECR", "INCRMOD", "DECRMOD",
+      "ADD", "SUB", "MUL", "DIV", "MOD", "NEG",
+      "LE", "LTE", "GT", "GTE", "EQ", "NEQ",
+      "AND", "OR", "XOR", "NOT",
+      "IF", "THEN", "ELSE",
+      "DO", "DOI", "LOOP",
+      "GOSUB", "RETURN",
+    ];
+
+    var opindex = {};
+    for (var i = 0, l = OPS.length; i < l; i++) {
+      opindex[OPS[i]] = i + 128;
+    }
+
+    Conf.prototype.__proto__ =
+    Func.prototype.__proto__ =
+    Assign.prototype.__proto__ =
+    Mut.prototype.__proto__ =
+    Binop.prototype.__proto__ =
+    Unop.prototype.__proto__ =
+    Call.prototype.__proto__ =
+    Variable.prototype.__proto__ =
+    Integer.prototype.__proto__ =
+    If.prototype.__proto__ =
+    Loop.prototype.__proto__ =
+    {
+      compile: function () {
+        throw new Error("TODO: compile " + this.constructor.name);
+      }
+    };
+    function Program(code) {
+      this.code = code;
+    }
+    Program.prototype.compile = function () {
+
+      this.code.forEach(decl => {
+        if (decl instanceof Conf) {
+          conf[decl.name] = decl.value;
+        }
+        else if (decl instanceof Func) {
+          funcs[decl.name] = true;
+        }
+        else {
+          throw new Error("Unexpected declaration");
+        }
+      });
+
+      this.code.forEach(decl => {
+        if (decl instanceof Func) {
+          code = [];
+          decl.body.compile();
+          funcs[decl.name] = code;
+        }
+      });
+      return { conf, locals, native, funcs };
+    };
+    function Conf(name, value) {
+      this.name = name;
+      this.value = value;
+    }
+    function Block(statements) {
+      this.statements = statements;
+    }
+    Block.prototype.compile = function () {
+      this.statements.forEach(statement => {
+        console.log(statement);
+        statement.compile();
+      });
+    }
+    function Func(name, body) {
+      this.name = name;
+      this.body = body;
+    }
+    function Assign(name, value) {
+      this.name = name;
+      this.value = value;
+    }
+    Assign.prototype.compile = function () {
+      this.value.compile();
+      var index = varSlot(this.name);
+      if (index < 15) {
+        code.push("SET" + index);
+      }
+      else {
+        code.push(index, "SETN");
+      }
+    };
+    function Mut(name, op, incr, mod) {
+      this.name = name;
+      this.op = op;
+      this.incr = incr;
+      this.mod = mod;
+    }
+    Mut.prototype.compile = function () {
+      var slot = varSlot(this.name);
+      var prefix = this.op === "ADD" ? "INCR" : "DECR";
+      this.incr.compile();
+      if (this.mod) {
+        this.mod.compile();
+        code.push(slot, prefix + "MOD");
+      }
+      else {
+        code.push(slot, prefix);
+      }
+    }
+    function Binop(op, left, right) {
+      this.op = op;
+      this.left = left;
+      this.right = right;
+    }
+    Binop.prototype.compile = function () {
+      this.left.compile();
+      this.right.compile();
+      code.push(this.op);
+    };
+    function Unop(op, right) {
+      this.op = op;
+      this.right = right;
+    }
+    Unop.prototype.compile = function () {
+      this.right.compile();
+      code.push(this.op);
+    }
+    function Call(name, args) {
+      this.name = name;
+      this.args = args;
+    }
+    Call.prototype.compile = function () {
+      if (this.name in funcs) {
+        if (this.args.length) {
+          throw new Error("user functions don't take args")
+        }
+        code.push(Object.keys(funcs).indexOf(this.name))
+        code.push("GOSUB");
+        return;
+      }
+      this.args.forEach(arg => {
+        arg.compile();
+      });
+      code.push(fnSlot(this.name));
+      var len = this.args.length;
+      if (len < 8) {
+        code.push("CALL" + len);
+      }
+      else {
+        code.push(len, "CALLN");
+      }
+    };
+    function Variable(name) {
+      this.name = name;
+    }
+    Variable.prototype.compile = function () {
+      if (this.name in conf) {
+        conf[this.name].compile();
+        return;
+      }
+      var slot = varSlot(this.name);
+      if (slot < 16) {
+        code.push("GET" + slot);
+      }
+      else {
+        code.push(slot, "GETN");
+      }
+    };
+    function Integer(value) {
+      this.value = value;
+    }
+    Integer.prototype.compile = function () {
+      code.push(this.value);
+    };
+    function If(pairs, last) {
+      this.pairs = pairs;
+      this.last = last;
+    }
+    If.prototype.compile = function () {
+      var pairs = this.pairs;
+      var last = this.last;
+      var i = 0, l = pairs.length;
+      function dump() {
+        var pair = pairs[i];
+        console.log("PAIR", pair)
+        pair[0].compile();
+        code.push("IF");
+        pair[1].compile();
+        if (++i < l) {
+          code.push("ELSE");
+          dump();
+        }
+        else if (last) {
+          code.push("ELSE");
+          last.compile();
+        }
+        code.push("THEN");
+      }
+      dump();
+    }
+    function Loop(name, count, body) {
+      this.name = name;
+      this.count = count;
+      this.body = body;
+    }
+    Loop.prototype.compile = function () {
+      this.count.compile();
+      if (this.name) {
+        code.push(varSlot(this.name), "DOI");
+      }
+      else {
+        code.push("DO");
+      }
+      this.body.compile();
+      code.push("LOOP");
+    }
 
     function list(head, tail, index) {
       return [head].concat(tail.map(entry => entry[index]));

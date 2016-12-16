@@ -24,6 +24,18 @@ static buffer_t read_stdin() {
   };
 }
 
+typedef struct {
+  size_t count;
+  int32_t data[];
+} context_t;
+
+typedef struct {
+  uint8_t **confs;
+  uint8_t **funcs;
+} program_t;
+
+
+
 int main() {
   buffer_t code = read_stdin();
   printf("len=%lu data=%p\n", code.len, code.data);

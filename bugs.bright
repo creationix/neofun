@@ -11,7 +11,7 @@ setup {
 // This is called once per animation loop before updating sprites.
 loop {
   fade(d)
-  d = (d % 4) + 1
+  d:4 += 1
 }
 
 // This is called for each sprite when it's spawned.
