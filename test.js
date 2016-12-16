@@ -21,5 +21,9 @@ console.log("\nPARSE TREE:");
 p(tree);
 
 console.log("\nSTACK CODE:");
-var code = tree.compile();
+var code = tree.assemble();
+p(code);
+
+console.log("\nSTACK CODE:");
+var code = tree.assemble();
 p(code);

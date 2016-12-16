@@ -89,6 +89,48 @@
     });
     return { conf, locals, native, funcs };
   };
+  Program.prototype.assemble = function () {
+    var code = this.compile();
+    var funcs = {};
+    for (var name in code.funcs) {
+      var assembly = code.funcs[name];
+      var data = funcs[name] = [];
+
+      function encodeNum(num) {
+        var neg = num < 0;
+        if (neg) {
+          num = -num;
+          neg = true;
+        }
+        if (num < 64) {
+          data.push(num);
+        }
+        else {
+          data.push(64 | (num & 63));
+          num >>>= 6;
+          while (num) {
+            data.push((num >= 128 ? 128 : 0) | (num & 127));
+            num >>>= 7;
+          }
+        }
+        if (neg) data.push(opindex["NEG"]);
+      }
+
+      console.log(assembly);
+      for (var part of assembly) {
+        if (typeof part === "string") {
+          data.push(opindex[part]);
+          continue;
+        }
+        if (typeof part === "number") {
+          encodeNum(part);
+          continue;
+        }
+      }
+      console.log(data);
+    }
+    return funcs;
+  }
   function Conf(name, value) {
     this.name = name;
     this.value = value;
@@ -218,7 +260,7 @@
   }
   Variable.prototype.compile = function () {
     if (this.name in conf) {
-      conf[this.name].compile();
+      code.push(conf[this.name]);
       return;
     }
     var slot = varSlot(this.name);
@@ -293,7 +335,7 @@ Declaration
   / Function
 
 Configuration
-  = i:ident _ "=" _ e:Integer { return new Conf(i, e); }
+  = i:ident _ "=" _ e:number { return new Conf(i, e); }
 
 Function
   = i:ident _ b:block { return new Func(i, b); }
@@ -425,10 +467,13 @@ e9
   / Call
   / Variable
 
-Integer
+number
   = digits:([-+]?[0-9]+) {
-      return new Integer(parseInt((digits[0]||"") + digits[1].join(""), 10))
+      return parseInt((digits[0]||"") + digits[1].join(""), 10)
     }
+
+Integer
+  = n:number { return new Integer(n); }
 
 length
   = Variable
