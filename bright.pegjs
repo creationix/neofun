@@ -35,7 +35,7 @@
     "SETN", "GETN", "CALLN",
     "INCR", "DECR", "INCRMOD", "DECRMOD",
     "ADD", "SUB", "MUL", "DIV", "MOD", "NEG",
-    "LE", "LTE", "GT", "GTE", "EQ", "NEQ",
+    "LT", "LTE", "GT", "GTE", "EQ", "NEQ",
     "AND", "OR", "XOR", "NOT",
     "IF", "THEN", "ELSE",
     "DO", "DOI", "LOOP",
@@ -98,7 +98,6 @@
   }
   Block.prototype.compile = function () {
     this.statements.forEach(statement => {
-      console.log(statement);
       statement.compile();
     });
   }
@@ -146,15 +145,48 @@
   Binop.prototype.compile = function () {
     this.left.compile();
     this.right.compile();
-    code.push(this.op);
+
+    if (typeof code[code.length - 1] !== "number" ||
+        typeof code[code.length - 2] !== "number") {
+      code.push(this.op);
+      return;
+    }
+    var right = code.pop();
+    var left = code.pop();
+    code.push(compute(this.op, left, right));
   };
+  function compute(op, left, right) {
+    switch (op) {
+      case "ADD": return left + right;
+      case "SUB": return left - right;
+      case "MUL": return left * right;
+      case "DIV": return (left / right) >>> 0;
+      case "MOD": return left % right;
+      case "NEG": return - right;
+      case "LT": return left < right ? 1 : 0;
+      case "LTE": return left <= right ? 1 : 0;
+      case "GT": return left > right ? 1 : 0;
+      case "GTE": return left >= right ? 1 : 0;
+      case "EQ": return left === right ? 1 : 0;
+      case "NEQ": return left !== right ? 1 : 0;
+      case "AND": return left && right;
+      case "OR": return left || right;
+      case "XOR": return left ? right ? 0 : left : right ? right : 0;
+      case "NOT": return right ? 0 : 1;
+    }
+  }
   function Unop(op, right) {
     this.op = op;
     this.right = right;
   }
   Unop.prototype.compile = function () {
     this.right.compile();
-    code.push(this.op);
+    if (typeof code[code.length - 1] !== "number") {
+      code.push(this.op);
+      return;
+    }
+    var right = code.pop();
+    code.push(compute(this.op, null, right));
   }
   function Call(name, args) {
     this.name = name;
@@ -213,7 +245,6 @@
     var i = 0, l = pairs.length;
     function dump() {
       var pair = pairs[i];
-      console.log("PAIR", pair)
       pair[0].compile();
       code.push("IF");
       pair[1].compile();
