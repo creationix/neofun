@@ -4,9 +4,14 @@ delay = 33  // Delay between animation loops in ms (defaults to 100)
 sprites = 4 // Total number of sprites to spawn at startup
 fizz = 3    // How many sprites to update per animation loop (defaults to all)
 
+// This is called once at program startup
+setup {
+  d = 0
+}
 // This is called once per animation loop before updating sprites.
 loop {
-  fade(1)
+  fade(d)
+  d = (d % 4) + 1
 }
 
 // This is called for each sprite when it's spawned.

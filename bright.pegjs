@@ -67,22 +67,19 @@ statement
         ["LOOP", count, b, name[0]] :
         ["LOOP", count, b]
       }
-  / expression
-
-
-expression = e1
-
-e1
-  = i:ident _ "=" _ v:e1 {
+  / i:ident _ "=" _ v:expression {
       return ["ASSIGN", i, v]
     }
-  / i:ident t:(":" length)? _ "+=" _ v:e1 {
+  / i:ident t:(":" length)? _ "+=" _ v:expression {
       return t ? ["INCRMOD", i, v, t[1]] : ["INCR", i, v]
     }
-  / i:ident t:(":" length)? _ "-=" _ v:e1 {
+  / i:ident t:(":" length)? _ "-=" _ v:expression {
       return t ? ["DECRMOD", i, v, t[1]] : ["DECR", i, v]
     }
-  / e2
+  / Call
+
+expression
+  = e2
 
 e2
   = left:e3 _ "or" _ right:e2 {
@@ -150,7 +147,7 @@ e8
   / e9
 
 e9
-  = "(" _ e:e1 _ ")" { return e }
+  = "(" _ e:expression _ ")" { return e }
   / integer
   / Call
   / Variable

@@ -5,7 +5,13 @@ try {
   var tree = parse(code);
 }
 catch (err) {
-  console.log(err);
+  if (err.location && err.name === 'SyntaxError') {
+    var start = err.location.start;
+    var loc = "At line " + start.line + " column " + start.column + ":\n";
+    err.message  = loc + err.message;
+    err.stack = loc + err.stack;
+  }
+  throw err;
 }
 function p(value) {
   console.log(inspect(value, {depth:null,colors:true}));
@@ -14,89 +20,78 @@ function p(value) {
 console.log("\nPARSE TREE:");
 p(tree);
 
-var names = {};
-function setType(name, type) {
-  var old = names[name];
+var types = {};
+var names = {
+  conf: [],
+  var: [],
+  native: [],
+  func: [],
+};
+
+function setType(name, type, fallback) {
+  var old = types[name];
   if (old) {
-    if (old === type) return;
-    if (old === "NATIVE" && type === "FUNC") {
-      names[name] = type;
-      return;
-    }
-    if (old === "FUNC" && type === "NATIVE") return;
+    if (old === type || (fallback && fallback === old)) return;
     throw new Error("Name conflict for '" + name + "' as both '" +
                     old + "' and '" + type + "'");
   }
-  names[name] = type;
+  types[name] = type;
+  names[type].push(name);
 }
-tree.forEach(nameWalk);
+
 function nameWalk(node) {
   if (!Array.isArray(node)) return;
   var type = node[0];
   if (Array.isArray(type)) {
     return nameWalk(type);
   }
-  if (type === "CONF" || type === "FUNC") {
-    setType(node[1], type);
-    return node.slice(2).forEach(nameWalk);
-  }
   if (type === "ASSIGN" ||
       type === "INCRMOD" || type === "DECRMOD" ||
       type === "INCR" || type === "DECR") {
-    setType(node[1], "VAR");
+    setType(node[1], "var", "conf");
     return node.slice(2).forEach(nameWalk);
   }
   if (type === "LOOP" && node.length >= 4) {
-    setType(node[3], "VAR");
+    setType(node[3], "var", "conf");
     return nameWalk(node[2]);
   }
   if (type === "CALL") {
-    setType(node[1], "NATIVE");
+    setType(node[1], "native", "func");
     return node.slice(2).forEach(nameWalk);
   }
   return node.slice(1).forEach(nameWalk);
 }
 
+tree.forEach(function (decl) {
+  setType(decl[1], decl[0].toLowerCase());
+});
+
+tree.forEach(function (decl) {
+  decl.slice(2).forEach(nameWalk);
+});
+
+console.log("\nTYPES:");
+p(types);
 console.log("\nNAMES:");
 p(names);
 
-var indexes = {};
-var types = {
-  conf: [],
-  func: [],
-  native: [],
-  var: [],
-};
-
-Object.keys(names).forEach(function (name) {
-  var type = names[name];
-  var list = types[type.toLowerCase()];
-  indexes[name] = list.length;
-  list.push(name);
-});
-
-console.log("\nINDEXES:");
-p(indexes);
-console.log("\nTYPES:");
-p(types);
-
-
-var code = {};
-tree.forEach(function (decl) {
-  var type = decl[0];
-  var name = decl[1];
-  if (type === "CONF") {
-    code[name] = decl[2];
-  }
-  else if (type === "FUNC") {
-    code[name] = stackify(decl.slice(2));
-  }
-  else {
-    throw new Error("Unexpected type: " + type);
-  }
-});
-
-function stackify(tree) {
-  var code = [];
-  p(tree);
-}
+//
+// var code = {};
+// tree.forEach(function (decl) {
+//   var type = decl[0];
+//   var name = decl[1];
+//   if (type === "GLOBAL") {
+//     code[name] = decl[2];
+//   }
+//   else if (type === "FUNC") {
+//     code[name] = stackify(decl.slice(2));
+//   }
+//   else {
+//     throw new Error("Unexpected type: " + type);
+//   }
+// });
+//
+// function stackify(tree) {
+//   var code = [];
+//   p(tree);
+// }
