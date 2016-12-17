@@ -3021,20 +3021,18 @@ function peg$parse(input, options) {
 
       // Encode section lengths
       encodeNum(bytes, code.native.length);
-      encodeNum(bytes, confNames.length);
       encodeNum(bytes, funcNames.length);
+      encodeNum(bytes, confNames.length);
 
-      // Encode confs as stack code instructions
-      for (var key in code.conf) {
-        encodeNum(bytes, code.conf[key]);
-      }
+      parts.push(new Buffer(bytes));
 
       // Encode user function lengths.
       for (var key in code.funcs) {
-        encodeNum(bytes, code.funcs[key].length);
+        var bytes = [];
+        var func = code.funcs[key];
+        encodeNum(bytes, func.length);
+        parts.push(new Buffer(bytes), new Buffer(func));
       }
-
-      parts.push(new Buffer(bytes));
 
       // Encode strings as list of null terminated strings
       var strings = code.native.concat(confNames).concat(funcNames)
@@ -3042,10 +3040,12 @@ function peg$parse(input, options) {
         parts.push(new Buffer(string + "\0"));
       }
 
-      // Encode stack code for user functions
-      for (var key in code.funcs) {
-        parts.push(new Buffer(code.funcs[key]));
+      // Encode confs as stack code instructions
+      bytes = [];
+      for (var key in code.conf) {
+        encodeNum(bytes, code.conf[key]);
       }
+      parts.push(new Buffer(bytes));
 
       return parts;
     };

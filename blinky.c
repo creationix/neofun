@@ -25,6 +25,14 @@ static buffer_t read_stdin() {
 }
 
 typedef struct {
+  int32_t version;
+  int32_t num_native;
+  int32_t num_func;
+  int32_t num_conf;
+  uint8_t *strings[];
+} program_t;
+
+typedef struct {
   size_t count;
   int32_t data[];
 } context_t;
