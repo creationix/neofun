@@ -2888,13 +2888,24 @@ function peg$parse(input, options) {
     }
 
     var OPS = [
-      "SET0",  "SET1",  "SET2",  "SET3",  "SET4",  "SET5",  "SET6",  "SET7",
-      "SET8",  "SET9",  "SET10", "SET11", "SET12", "SET13", "SET14", "SET15",
-      "GET0",  "GET1",  "GET2",  "GET3",  "GET4",  "GET5",  "GET6",  "GET7",
-      "GET8",  "GET9",  "GET10", "GET11", "GET12", "GET13", "GET14", "GET15",
-      "CALL0",  "CALL1",  "CALL2",  "CALL3",  "CALL4",  "CALL5",  "CALL6",  "CALL7",
-      "SETN", "GETN", "CALLN",
+      "INT8", "INT16", "INT32",
+      "CALL",
+      "CALL0-0", "CALL0-1", "CALL0-2", "CALL0-3", "CALL0-4",
+      "CALL1-0", "CALL1-1", "CALL1-2", "CALL1-3", "CALL1-4",
+      "CALL2-0", "CALL2-1", "CALL2-2", "CALL2-3", "CALL2-4",
+      "CALL3-0", "CALL3-1", "CALL3-2", "CALL3-3", "CALL3-4",
+      "CALL4-0", "CALL4-1", "CALL4-2", "CALL4-3", "CALL4-4",
+      "CALL5-0", "CALL5-1", "CALL5-2", "CALL5-3", "CALL5-4",
+      "CALL6-0", "CALL6-1", "CALL6-2", "CALL6-3", "CALL6-4",
+      "CALL7-0", "CALL7-1", "CALL7-2", "CALL7-3", "CALL7-4",
+      "SET",
+      "SET0", "SET1", "SET2", "SET3", "SET4",
+      "SET5", "SET6", "SET7", "SET8", "SET9",
+      "GET",
+      "GET0", "GET1", "GET2", "GET3", "GET4",
+      "GET5", "GET6", "GET7", "GET8", "GET9",
       "INCR", "DECR", "INCRMOD", "DECRMOD",
+      "INCR1", "DECR1", "INCR1MOD", "DECR1MOD",
       "ADD", "SUB", "MUL", "DIV", "MOD", "NEG",
       "LT", "LTE", "GT", "GTE", "EQ", "NEQ",
       "AND", "OR", "XOR", "NOT",
@@ -2902,6 +2913,7 @@ function peg$parse(input, options) {
       "DO", "DOI", "LOOP",
       "GOSUB", "RETURN",
     ];
+    // throw OPS.length
 
     var opindex = {};
     for (var i = 0, l = OPS.length; i < l; i++) {
@@ -2948,8 +2960,34 @@ function peg$parse(input, options) {
           funcs[decl.name] = code;
         }
       });
-      return { conf, locals, native, funcs };
+      return { conf, locals: locals.length, native, funcs };
     };
+    function encodeNum(data, num) {
+      var more = true;
+      if (num >= 0 && num < 0x80) {
+        data.push(num);
+      }
+      else if (num < 0x80 && num >= -0x80) {
+        data.push(opindex.INT8,
+          (num >>> 0) & 0xff);
+      }
+      else if (num < 0x8000 && num >= -0x8000) {
+        data.push(opindex.INT16,
+          (num >>> 8) & 0xff,
+          (num >>> 0) & 0xff);
+      }
+      else if (num < 0x80000000 && num >= -0x80000000) {
+        data.push(opindex.INT32,
+          (num >>> 24) & 0xff,
+          (num >>> 16) & 0xff,
+          (num >>> 8) & 0xff,
+          (num >>> 0) & 0xff);
+      }
+      else {
+        throw new Error("Number out of range: " + num);
+      }
+    }
+
     Program.prototype.assemble = function () {
       var code = this.compile();
       var funcs = {};
@@ -2957,41 +2995,60 @@ function peg$parse(input, options) {
         var assembly = code.funcs[name];
         var data = funcs[name] = [];
 
-        function encodeNum(num) {
-          var neg = num < 0;
-          if (neg) {
-            num = -num;
-            neg = true;
-          }
-          if (num < 64) {
-            data.push(num);
-          }
-          else {
-            data.push(64 | (num & 63));
-            num >>>= 6;
-            while (num) {
-              data.push((num >= 128 ? 128 : 0) | (num & 127));
-              num >>>= 7;
-            }
-          }
-          if (neg) data.push(opindex["NEG"]);
-        }
-
-        console.log(assembly);
         for (var part of assembly) {
           if (typeof part === "string") {
             data.push(opindex[part]);
             continue;
           }
           if (typeof part === "number") {
-            encodeNum(part);
+            encodeNum(data, part);
             continue;
           }
         }
-        console.log(data);
       }
-      return funcs;
-    }
+      code.funcs = funcs;
+      return code;
+    };
+    Program.prototype.package = function () {
+      var code = this.assemble();
+      var confNames = Object.keys(code.conf);
+      var funcNames = Object.keys(code.funcs);
+
+      var parts = [];
+
+      // Encode magic header with version number
+      var bytes = [0x42, 0x74, 0x00]; // 'B' 't' 0
+
+      // Encode section lengths
+      encodeNum(bytes, code.native.length);
+      encodeNum(bytes, confNames.length);
+      encodeNum(bytes, funcNames.length);
+
+      // Encode confs as stack code instructions
+      for (var key in code.conf) {
+        encodeNum(bytes, code.conf[key]);
+      }
+
+      // Encode user function lengths.
+      for (var key in code.funcs) {
+        encodeNum(bytes, code.funcs[key].length);
+      }
+
+      parts.push(new Buffer(bytes));
+
+      // Encode strings as list of null terminated strings
+      var strings = code.native.concat(confNames).concat(funcNames)
+      for (var string of strings) {
+        parts.push(new Buffer(string + "\0"));
+      }
+
+      // Encode stack code for user functions
+      for (var key in code.funcs) {
+        parts.push(new Buffer(code.funcs[key]));
+      }
+
+      return parts;
+    };
     function Conf(name, value) {
       this.name = name;
       this.value = value;
@@ -3015,11 +3072,11 @@ function peg$parse(input, options) {
     Assign.prototype.compile = function () {
       this.value.compile();
       var index = varSlot(this.name);
-      if (index < 15) {
+      if (index < 10) {
         code.push("SET" + index);
       }
       else {
-        code.push(index, "SETN");
+        code.push(index, "SET");
       }
     };
     function Mut(name, op, incr, mod) {
@@ -3032,6 +3089,10 @@ function peg$parse(input, options) {
       var slot = varSlot(this.name);
       var prefix = this.op === "ADD" ? "INCR" : "DECR";
       this.incr.compile();
+      if (code[code.length - 1] === 1) {
+        code.pop();
+        prefix += "1";
+      }
       if (this.mod) {
         this.mod.compile();
         code.push(slot, prefix + "MOD");
@@ -3107,13 +3168,13 @@ function peg$parse(input, options) {
       this.args.forEach(arg => {
         arg.compile();
       });
-      code.push(fnSlot(this.name));
+      var index = fnSlot(this.name);
       var len = this.args.length;
-      if (len < 8) {
-        code.push("CALL" + len);
+      if (len <= 4 && index < 8) {
+        code.push("CALL" + index + "-" + len);
       }
       else {
-        code.push(len, "CALLN");
+        code.push(index, len, "CALL");
       }
     };
     function Variable(name) {
@@ -3125,11 +3186,11 @@ function peg$parse(input, options) {
         return;
       }
       var slot = varSlot(this.name);
-      if (slot < 16) {
+      if (slot < 10) {
         code.push("GET" + slot);
       }
       else {
-        code.push(slot, "GETN");
+        code.push(slot, "GET");
       }
     };
     function Integer(value) {

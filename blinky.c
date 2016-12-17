@@ -34,8 +34,6 @@ typedef struct {
   uint8_t **funcs;
 } program_t;
 
-
-
 int main() {
   buffer_t code = read_stdin();
   printf("len=%lu data=%p\n", code.len, code.data);
