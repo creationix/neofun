@@ -35,8 +35,13 @@
     "CALL3-0", "CALL3-1", "CALL3-2", "CALL3-3", "CALL3-4",
     "CALL4-0", "CALL4-1", "CALL4-2", "CALL4-3", "CALL4-4",
     "CALL5-0", "CALL5-1", "CALL5-2", "CALL5-3", "CALL5-4",
-    "CALL6-0", "CALL6-1", "CALL6-2", "CALL6-3", "CALL6-4",
-    "CALL7-0", "CALL7-1", "CALL7-2", "CALL7-3", "CALL7-4",
+    "RUN",
+    "RUN0-0", "RUN0-1", "RUN0-2", "RUN0-3", "RUN0-4",
+    "RUN1-0", "RUN1-1", "RUN1-2", "RUN1-3", "RUN1-4",
+    "RUN2-0", "RUN2-1", "RUN2-2", "RUN2-3", "RUN2-4",
+    "RUN3-0", "RUN3-1", "RUN3-2", "RUN3-3", "RUN3-4",
+    "RUN4-0", "RUN4-1", "RUN4-2", "RUN4-3", "RUN4-4",
+    "RUN5-0", "RUN5-1", "RUN5-2", "RUN5-3", "RUN5-4",
     "SET",
     "SET0", "SET1", "SET2", "SET3", "SET4",
     "SET5", "SET6", "SET7", "SET8", "SET9",
@@ -96,6 +101,9 @@
       if (decl instanceof Func) {
         code = [];
         decl.body.compile();
+        if (code[code.length - 1] !== "RETURN") {
+          code.push("RETURN");
+        }
         funcs[decl.name] = code;
       }
     });
@@ -162,6 +170,7 @@
     encodeNum(bytes, code.native.length);
     encodeNum(bytes, funcNames.length);
     encodeNum(bytes, confNames.length);
+    encodeNum(bytes, code.locals);
 
     parts.push(new Buffer(bytes));
 
@@ -294,6 +303,7 @@
   function Call(name, args) {
     this.name = name;
     this.args = args;
+    this.run = false;
   }
   Call.prototype.compile = function () {
     if (this.name in funcs) {
@@ -309,11 +319,12 @@
     });
     var index = fnSlot(this.name);
     var len = this.args.length;
-    if (len <= 4 && index < 8) {
-      code.push("CALL" + index + "-" + len);
+    var type = this.run ? "RUN" : "CALL";
+    if (len <= 4 && index < 6) {
+      code.push(type + index + "-" + len);
     }
     else {
-      code.push(index, len, "CALL");
+      code.push(index, len, type);
     }
   };
   function Variable(name) {
@@ -452,7 +463,10 @@ statement
   / i:ident t:(":" length)? _ "-=" _ v:expression {
       return new Mut(i, "SUB", v, t && t[1]);
     }
-  / Call
+  / c:Call {
+      c.run = true;
+      return c;
+    }
 
 expression
   = e2
