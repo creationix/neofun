@@ -23,6 +23,7 @@ int32_t decode_num(uint8_t **pc) {
     return *(*pc)++;
   }
   assert(0); // TODO: parse larger numbers
+  return -1;
 }
 
 char* decode_string(uint8_t **pc) {
@@ -41,9 +42,17 @@ buffer_t decode_buffer(uint8_t **pc) {
   return buf;
 }
 
+int32_t read_config(program_t *prog, const char *key, int32_t fallback) {
+  for (int i = 0; i < prog->num_confs; i++) {
+    if (strcmp(prog->confs[i].name, key)) continue;
+    return prog->confs[i].value;
+  }
+  return fallback;
+}
+
 // Takes bytecode and a list of named native function pointers and returns a
 // fully linked VM context.
-program_t *program_create(buffer_t bytecode, def_t natives[], const char* user[]) {
+program_t *program_create(buffer_t bytecode, def_t natives[]) {
   program_t *prog = malloc(sizeof(*prog));
 
   uint8_t *pc = bytecode.data;
@@ -54,12 +63,12 @@ program_t *program_create(buffer_t bytecode, def_t natives[], const char* user[]
   prog->num_locals = decode_num(&pc);
 
   // Decode Configurations
-  int num_confs = decode_num(&pc);
-  prog->conf = malloc(sizeof(config_t) * num_confs);
-  for (int i = 0; i < num_confs; i++) {
+  prog->num_confs = decode_num(&pc);
+  prog->confs = malloc(sizeof(config_t) * prog->num_confs);
+  for (int i = 0; i < prog->num_confs; i++) {
     const char* name = decode_string(&pc);
     int32_t value = decode_num(&pc);
-    prog->conf[i] = (config_t){
+    prog->confs[i] = (config_t){
       .name = name,
       .value = value
     };
@@ -84,11 +93,10 @@ program_t *program_create(buffer_t bytecode, def_t natives[], const char* user[]
     printf("NATIVE %s\n", name);
   }
 
-
   // Read the lengths from the bytecode header
-  int num_funcs = decode_num(&pc);
-  prog->funcs = malloc(sizeof(func_t) * num_funcs);
-  for (int i = 0; i < num_funcs; i++) {
+  prog->num_funcs = decode_num(&pc);
+  prog->funcs = malloc(sizeof(func_t) * prog->num_funcs);
+  for (int i = 0; i < prog->num_funcs; i++) {
     const char* name = decode_string(&pc);
     buffer_t buf = decode_buffer(&pc);
     prog->funcs[i] = (func_t){

@@ -34,8 +34,10 @@ typedef struct {
   buffer_t bytecode;
   int num_locals;
   native_t *natives;
+  int num_funcs;
   func_t *funcs;
-  config_t *conf;
+  int num_confs;
+  config_t *confs;
 } program_t;
 
 typedef struct {
