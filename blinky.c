@@ -43,7 +43,7 @@ static int32_t bt_respawn(int32_t *argv, size_t argc) {
   return 0;
 }
 
-static program_t *link_stdin(def_t *natives) {
+static program_t *link_stdin(def_t *natives, const char **user) {
   // Read from stdin to a buffer.
   buffer_t buf = buffer_create(1024);
   size_t length = 0;
@@ -59,11 +59,8 @@ static program_t *link_stdin(def_t *natives) {
   }
   buffer_resize(&buf, length);
 
-  // Link the buf to native functions to create a context
-  program_t *prog = program_create(buf, natives);
-
-  // We're done with the buffer now, empty it to free memory.
-  buffer_resize(&buf, 0);
+  // Parse and link bytecode
+  program_t *prog = program_create(buf, natives, user);
 
   return prog;
 }
@@ -75,6 +72,13 @@ int main() {
     { "hue", bt_hue },
     { "respawn", bt_respawn },
     { NULL, NULL }
+  }, (const char*[]) {
+    "init",
+    "loop",
+    "spawn",
+    "update",
+    NULL
   });
   printf("prog=%p\n", prog);
+  // prog->natives[0](pp)
 }

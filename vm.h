@@ -24,11 +24,17 @@ typedef struct {
   int32_t value;
 } config_t;
 
+typedef struct {
+  const char *name;
+  buffer_t code;
+} func_t;
+
 // This stores all shared program state between contexts in the same program.
 typedef struct {
+  buffer_t bytecode;
   int num_locals;
   native_t *natives;
-  buffer_t *funcs;
+  func_t *funcs;
   config_t *conf;
 } program_t;
 

@@ -3034,37 +3034,45 @@ function peg$parse(input, options) {
 
       var parts = [];
 
-      // Encode magic header with version number
-      var bytes = [0x42, 0x74, 0x00]; // 'B' 't' 0
-
-      // Encode section lengths
-      encodeNum(bytes, code.native.length);
-      encodeNum(bytes, funcNames.length);
-      encodeNum(bytes, confNames.length);
-      encodeNum(bytes, code.locals);
-
-      parts.push(new Buffer(bytes));
-
-      // Encode user function lengths.
-      for (var key in code.funcs) {
+      function pushNum(num) {
         var bytes = [];
-        var func = code.funcs[key];
-        encodeNum(bytes, func.length);
-        parts.push(new Buffer(bytes), new Buffer(func));
+        encodeNum(bytes, num);
+        parts.push(new Buffer(bytes));
+      }
+      function pushString(str) {
+        parts.push(new Buffer(str + "\0"));
+      }
+      function pushBuffer(buf) {
+        pushNum(buf.length);
+        parts.push(new Buffer(buf));
       }
 
-      // Encode strings as list of null terminated strings
-      var strings = code.native.concat(confNames).concat(funcNames)
-      for (var string of strings) {
-        parts.push(new Buffer(string + "\0"));
-      }
+      // Encode magic header with version number
+      parts.push(new Buffer([0x42, 0x74, 0x00])); // 'B' 't' 0
 
-      // Encode confs as stack code instructions
-      bytes = [];
+      // Encode number of local variable slots required in stack
+      pushNum(code.locals);
+
+      // Encode Configurations
+      pushNum(confNames.length);
       for (var key in code.conf) {
-        encodeNum(bytes, code.conf[key]);
+        pushString(key);
+        pushNum(code.conf[key]);
       }
-      parts.push(new Buffer(bytes));
+
+      // Encode native function names
+      pushNum(code.native.length);
+      for (var name of code.native) {
+        pushString(name);
+      }
+
+      // Encode user functions
+      pushNum(funcNames.length);
+      for (var key in code.funcs) {
+        pushString(key);
+        var func = code.funcs[key];
+        pushBuffer(func);
+      }
 
       return parts;
     };
