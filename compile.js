@@ -18,14 +18,14 @@ function p(value) {
   console.error(inspect(value, {depth:null,colors:true}));
 }
 
-console.error("\nPARSE TREE:");
-p(tree);
+// console.error("\nPARSE TREE:");
+// p(tree);
 
-console.error("\nASSEMBLY CODE:");
 var code = tree.compile();
-p(code);
+// console.error("\nASSEMBLY CODE:");
+// p(code);
 
-console.error("\nPACKAGE:");
 var parts = tree.package();
-p(parts);
+// console.error("\nPACKAGE:");
+// p(parts);
 process.stdout.write(Buffer.concat(parts));

@@ -1,13 +1,13 @@
-length = 1500 // Our strip has 60 LEDs
-bpp = 3      // We are using normal ws2812b lights that expect 3 bytes of color.
-delay = 16   // Delay between animation loops in ms (defaults to 100)
-sprites = 10  // Total number of sprites to spawn at startup
+length = 4000 // Our strip has 60 LEDs
+bpp = 3       // We are using normal ws2812b lights that expect 3 bytes of color.
+delay = 33    // Delay between animation loops in ms (defaults to 100)
+sprites = 20  // Total number of sprites to spawn at startup
 // fizz = 5     // How many sprites to update per animation loop (defaults to all)
 
 // This is called once at program startup
-setup {
+// setup {
   // d = 0
-}
+// }
 
 // This is called once per animation loop before updating sprites.
 loop {

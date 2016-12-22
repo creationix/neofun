@@ -142,6 +142,7 @@ typedef struct {
 } loop_t;
 
 void call_func(context_t *ctx, int index) {
+  if (index < 0) return;
   // printf("\nStarting: %p %d:%s\n", ctx, index, ctx->prog->funcs[index].name);
   buffer_t code = ctx->prog->funcs[index].code;
   uint8_t *pc = code.data;
