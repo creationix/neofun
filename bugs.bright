@@ -1,17 +1,18 @@
-length = 60 // Our strip has 60 LEDs
-bpp = 3     // We are using normal ws2812b lights that expect 3 bytes of color.
-delay = 33  // Delay between animation loops in ms (defaults to 100)
-sprites = 4 // Total number of sprites to spawn at startup
-fizz = 3    // How many sprites to update per animation loop (defaults to all)
+length = 1500 // Our strip has 60 LEDs
+bpp = 3      // We are using normal ws2812b lights that expect 3 bytes of color.
+delay = 16   // Delay between animation loops in ms (defaults to 100)
+sprites = 10  // Total number of sprites to spawn at startup
+// fizz = 5     // How many sprites to update per animation loop (defaults to all)
 
 // This is called once at program startup
 setup {
-  d = 0
+  // d = 0
 }
+
 // This is called once per animation loop before updating sprites.
 loop {
-  d:4 += 1
-  fade(d)
+  // d:4 += 1
+  fade(230)
 }
 
 // This is called for each sprite when it's spawned.
@@ -19,16 +20,16 @@ loop {
 spawn {
   p = rand(length)    // Random starting position
   h = rand(768)       // Random starting hue
-  l = rand(50) + 50   // Semi-random lifetime
-  r = rand(2) * 2 - 1 // Random direction
+  l = rand(100) + 50  // Semi-random lifetime
+  d = rand(2) * 2 - 1 // Random direction
 }
 
 // This is called once per sprite update
 // you can access global variables as well as sprite local variables.
 update {
-  p:length += 1  // Move 1 pixel forward
+  p:length += d  // Move 1 pixel forward
   h:768 += 7     // Slightly change hue
-  hue(p, h, 100) // Draw new position
+  hue(p, h, 200) // Draw new position
   l -= 1         // Decrement lifetime.
   if l <= 0 {
     explode()    // When lifetime reaches zero, explode!
@@ -39,7 +40,8 @@ update {
 explode {
   b = 255
   loop i:14 {
-    b -= 18
+    b -= 14
+    h:786 -= 7
     hue(p + i, h, b)
     hue(p - i, h, b)
   }

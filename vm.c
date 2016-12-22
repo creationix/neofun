@@ -57,8 +57,28 @@ static int32_t decode_num(uint8_t **pc) {
   if (**pc < 128) {
     return *(*pc)++;
   }
-  assert(0); // TODO: parse larger numbers
-  return -1;
+  switch (*(*pc)++) {
+    int32_t val;
+    case INT8:
+      val = (int8_t)**pc;
+      (*pc)++;
+      return val;
+    case INT16:
+      val = (int16_t)(**pc << 8 | *((*pc) + 1));
+      (*pc) += 2;
+      return val;
+    case INT32:
+      val = (int16_t)(
+        *(*pc) << 24 |
+        *((*pc) + 1) << 16 |
+        *((*pc) + 2) << 8 |
+        *((*pc) + 3));
+      (*pc) += 4;
+      return val;
+    default:
+      assert(0);
+      return -1;
+  }
 }
 
 static char* decode_string(uint8_t **pc) {
@@ -93,12 +113,13 @@ int get_func(program_t *prog, const char *key) {
   return -1;
 }
 
-context_t create_context(program_t *prog) {
+context_t create_context(program_t *prog, void *user) {
   context_t ctx = (context_t){
     .prog = prog,
     .size = prog->num_locals,
     .top = prog->num_locals,
     .data = malloc(sizeof(int32_t) * prog->num_locals),
+    .user = user
   };
   memset(ctx.data, 0, sizeof(int32_t) * prog->num_locals);
   return ctx;
@@ -171,7 +192,7 @@ void call_func(context_t *ctx, int index) {
       for (int i = argc - 1; i >= 0; i--) {
         argv[i] = pop(ctx);
       }
-      push(ctx, fn(ctx, argv, argc));
+      push(ctx, fn(ctx->user, argv, argc));
       continue;
     }
     if (*pc > RUN && *pc < SET) {
@@ -183,7 +204,7 @@ void call_func(context_t *ctx, int index) {
       for (int i = argc - 1; i >= 0; i--) {
         argv[i] = pop(ctx);
       }
-      fn(ctx, argv, argc);
+      fn(ctx->user, argv, argc);
       continue;
     }
     if (*pc > SET && *pc < GET) {

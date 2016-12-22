@@ -44,7 +44,7 @@ typedef struct context_s context_t;
 
 // Type signature for native functions.  Basically these receive a list of
 // 32-bit integers and return a single 32-bit integer.
-typedef int32_t (*native_t)(context_t *ctx, int32_t *argv, size_t argc);
+typedef int32_t (*native_t)(void *user, int32_t *argv, size_t argc);
 
 // This is a pair of name with function pointer. An array of this is used
 // for linking in native functions when creating a program.
@@ -79,6 +79,7 @@ struct context_s {
   size_t size;
   size_t top;
   int32_t *data;
+  void *user;
 };
 
 #endif
