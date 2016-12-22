@@ -10,8 +10,8 @@ setup {
 }
 // This is called once per animation loop before updating sprites.
 loop {
-  fade(d)
   d:4 += 1
+  fade(d)
 }
 
 // This is called for each sprite when it's spawned.
@@ -43,5 +43,5 @@ explode {
     hue(p + i, h, b)
     hue(p - i, h, b)
   }
-  respawn() // And then restart the sprite.
+  spawn() // And then restart the sprite.
 }

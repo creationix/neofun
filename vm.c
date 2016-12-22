@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 
+static uint32_t deadbeef_seed;
+static uint32_t deadbeef_beef = 0xdeadbeef;
+
 const char **names = (const char*[]){
   "INT8", "INT16", "INT32",
   "CALL",
@@ -33,10 +36,9 @@ const char **names = (const char*[]){
   "IF", "THEN", "ELSE",
   "DO", "DOI", "LOOP",
   "GOSUB", "RETURN",
-
 };
 
-void push(context_t *ctx, int32_t value) {
+static void push(context_t *ctx, int32_t value) {
   // Resize stack if we need more room.
   if (ctx->top == ctx->size) {
     ctx->size += 4;
@@ -46,12 +48,12 @@ void push(context_t *ctx, int32_t value) {
   ctx->data[ctx->top++] = value;
 }
 
-int32_t pop(context_t *ctx) {
+static int32_t pop(context_t *ctx) {
   assert(ctx->top > 0);
   return ctx->data[--ctx->top];
 }
 
-int32_t decode_num(uint8_t **pc) {
+static int32_t decode_num(uint8_t **pc) {
   if (**pc < 128) {
     return *(*pc)++;
   }
@@ -59,13 +61,13 @@ int32_t decode_num(uint8_t **pc) {
   return -1;
 }
 
-char* decode_string(uint8_t **pc) {
+static char* decode_string(uint8_t **pc) {
   uint8_t *start = *pc;
   while (*(*pc)++);
   return (char*)start;
 }
 
-buffer_t decode_buffer(uint8_t **pc) {
+static buffer_t decode_buffer(uint8_t **pc) {
   int32_t len = decode_num(pc);
   buffer_t buf = {
     .len = len,
@@ -96,42 +98,130 @@ context_t create_context(program_t *prog) {
     .prog = prog,
     .size = prog->num_locals,
     .top = prog->num_locals,
-    .data = malloc(sizeof(int32_t) * prog->num_locals)
+    .data = malloc(sizeof(int32_t) * prog->num_locals),
   };
   memset(ctx.data, 0, sizeof(int32_t) * prog->num_locals);
   return ctx;
 }
 
+#define binop(op) { \
+  int r = pop(ctx); \
+  int l = pop(ctx); \
+  push(ctx, l op r); \
+  continue; \
+}
+
+#define MAX_LOOPS 10
+
+typedef struct {
+  int slot;
+  int index;
+  int limit;
+  uint8_t *pc;
+} loop_t;
+
 void call_func(context_t *ctx, int index) {
+  // printf("\nStarting: %p %d:%s\n", ctx, index, ctx->prog->funcs[index].name);
   buffer_t code = ctx->prog->funcs[index].code;
   uint8_t *pc = code.data;
+  int en = 0, co = 0; // Conditional nesting
+  loop_t loops[MAX_LOOPS];
+  int num_loops = 0;
   while (*pc != RETURN) {
+    // printf("Stack %d:", en < co);
+    // for (int i = 0; i < ctx->top; i++) {
+    //   printf(" %d", ctx->data[i]);
+    // }
+    // printf("\n");
+    if (en < co) {
+      if (*pc < 128) {
+        // printf("Skipping %p:%d\n", pc, *pc);
+        pc++;
+        continue;
+      }
+      // printf("Skipping %p:%s\n", pc, names[*pc - 128]);
+      switch (*pc++) {
+        case ELSE:
+          en = co;
+          continue;
+        case IF: case DO:
+          co++;
+          continue;
+        case THEN: case LOOP:
+          co--;
+          continue;
+        case INT8: pc += 1; continue;
+        case INT16: pc += 2; continue;
+        case INT32: pc += 4; continue;
+        default: continue;
+      }
+    }
     if (*pc < 128) {
-      printf("Running %p:%d\n", pc, *pc);
+      // printf("Running %p:%d\n", pc, *pc);
       push(ctx, *pc++);
       continue;
     }
-    printf("Running %p:%s\n", pc, names[*pc - 128]);
+    // printf("Running %p:%s\n", pc, names[*pc - 128]);
+    if (*pc > CALL && *pc < RUN) {
+      int index = *pc++ - (CALL + 1);
+      int argc = index % 5;
+      index /= 5;
+      native_t fn = ctx->prog->natives[index];
+      int32_t argv[5];
+      for (int i = argc - 1; i >= 0; i--) {
+        argv[i] = pop(ctx);
+      }
+      push(ctx, fn(ctx, argv, argc));
+      continue;
+    }
+    if (*pc > RUN && *pc < SET) {
+      int index = *pc++ - (RUN + 1);
+      int argc = index % 5;
+      index /= 5;
+      native_t fn = ctx->prog->natives[index];
+      int32_t argv[5];
+      for (int i = argc - 1; i >= 0; i--) {
+        argv[i] = pop(ctx);
+      }
+      fn(ctx, argv, argc);
+      continue;
+    }
     if (*pc > SET && *pc < GET) {
       int index = *pc++ - (SET + 1);
       ctx->data[index] = pop(ctx);
       continue;
     }
-    else if (*pc > CALL && *pc < RUN) {
-      printf("TODO: callx-y\n");
+    if (*pc > GET && *pc < INCR) {
+      int index = *pc++ - (GET + 1);
+      push(ctx, ctx->data[index]);
+      continue;
     }
     switch ((opcode_t)*pc++) {
       case INT8:
-        push(ctx, *((int8_t*)pc));
+        push(ctx, (int8_t)*pc);
         pc += 1; continue;
       case INT16:
-        push(ctx, *((int16_t*)pc));
+        push(ctx, (int16_t)(*pc << 8 | *(pc + 1)));
         pc += 2; continue;
       case INT32:
-        push(ctx, *((int32_t*)pc));
+        push(ctx, (int16_t)(
+          *pc << 24 |
+          *(pc + 1) << 16 |
+          *(pc + 2) << 8 |
+          *(pc + 3)));
         pc += 4; continue;
-      case INCR:
-      case DECR:
+      case INCR: {
+        int index = pop(ctx);
+        int delta = pop(ctx);
+        ctx->data[index] += delta;
+        continue;
+      }
+      case DECR: {
+        int index = pop(ctx);
+        int delta = pop(ctx);
+        ctx->data[index] -= delta;
+        continue;
+      }
       case INCRMOD: {
         int index = pop(ctx);
         int mod = pop(ctx);
@@ -139,23 +229,96 @@ void call_func(context_t *ctx, int index) {
         ctx->data[index] = (ctx->data[index] + delta) % mod;
         continue;
       }
-      case DECRMOD:
+      case DECRMOD: {
+        int index = pop(ctx);
+        int mod = pop(ctx);
+        int delta = pop(ctx);
+        ctx->data[index] = (ctx->data[index] - delta + mod) % mod;
+        continue;
+      }
       case INCR1:
+        ctx->data[pop(ctx)]++;
+        continue;
       case DECR1:
-        printf("TODO: Implement %s\n", names[*(pc - 1) - 128]);
-        exit(-2);
+        ctx->data[pop(ctx)]--;
+        continue;
       case INCR1MOD: {
         int index = pop(ctx);
         int mod = pop(ctx);
         ctx->data[index] = (ctx->data[index] + 1) % mod;
         continue;
       }
-      case DECR1MOD:
-
+      case DECR1MOD: {
+        int index = pop(ctx);
+        int mod = pop(ctx);
+        ctx->data[index] = (ctx->data[index] + mod - 1) % mod;
+        continue;
+      }
+      case ADD: binop(+)
+      case SUB: binop(-)
+      case MUL: binop(*)
+      case DIV: binop(/)
+      case MOD: binop(%)
+      case NEG:
+        ctx->data[ctx->top - 1] = -ctx->data[ctx->top - 1];;
+        continue;
+      case LT: binop(<)
+      case LTE: binop(<=)
+      case GT: binop(>)
+      case GTE: binop(>=)
+      case EQ: binop(==)
+      case NEQ: binop(!=)
+      case AND: binop(&&)
+      case OR: binop(||)
+      case XOR: {
+        int r = pop(ctx);
+        int l = pop(ctx);
+        push(ctx, (l && !r) || (!l && r));
+        continue;
+      }
+      case NOT:
+        ctx->data[ctx->top - 1] = !ctx->data[ctx->top - 1];;
+        continue;
+      case IF:
+        co++;
+        if (pop(ctx)) en = co;
+        continue;
+      case ELSE:
+        en = co - 1;
+        continue;
+      case THEN:
+        co--;
+        continue;
+      case GOSUB:
+        call_func(ctx, pop(ctx));
+        continue;
+      case DO: case DOI: {
+        int slot = *(pc - 1) == DOI ? pop(ctx) : -1;
+        int count = pop(ctx);
+        loops[num_loops++] = (loop_t){
+          .slot = slot,
+          .index = 0,
+          .limit = count,
+          .pc = pc
+        };
+        if (slot >= 0) ctx->data[slot] = 0;
+        continue;
+      }
+      case LOOP: {
+        int i = num_loops - 1;
+        if (++loops[i].index < loops[i].limit) {
+          pc = loops[i].pc;
+          if (loops[i].slot >= 0) {
+            ctx->data[loops[i].slot] = loops[i].index;
+          }
+          continue;
+        }
+        num_loops--;
+        continue;
+      }
       default:
         printf("TODO: Implement %s\n", names[*(pc - 1) - 128]);
         exit(-2);
-
     }
   }
 }
