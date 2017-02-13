@@ -1,23 +1,27 @@
+#include <dlfcn.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
+#include "mjs/mjs.c"
+#include "buffer.c"
 
 static volatile int alive = 1;
+static int count;
+static int width;
+static int height;
+static uint8_t* pixels;
 
-#define width 122
-#define height 70
-#define count (width*height)
-uint8_t pixels[count * 3];
-
-void fade(uint8_t keep) {
+static void fade(uint8_t keep) {
   for (int i = 0; i < count * 3; i++) {
     pixels[i] = pixels[i] * keep >> 8;
   }
 }
-void update() {
+
+static void update() {
   bool empty = false;
   printf("\e[H");
   for (int y = 0; y < height; y += 2) {
@@ -54,14 +58,15 @@ void update() {
     }
   }
 }
-void rgb(int p, int r, int g, int b) {
+
+static void rgb(int p, int r, int g, int b) {
   int i = ((p + count) % count) * 3;
   pixels[i] = r;
   pixels[++i] = g;
   pixels[++i] = b;
 }
 
-void rgbl(int p, uint8_t r, uint8_t g, uint8_t b, uint8_t keep) {
+static void rgbl(int p, uint8_t r, uint8_t g, uint8_t b, uint8_t keep) {
   int i = ((p + count) % count) * 3;
   pixels[i] = (r * keep + pixels[i] * (255 - keep)) >> 8;
   i++;
@@ -73,7 +78,7 @@ void rgbl(int p, uint8_t r, uint8_t g, uint8_t b, uint8_t keep) {
 // R- /^^\__
 // G- ^\__/^
 // B- __/^^\_
-void hue(int p, int h, uint8_t keep) {
+static void hue(int p, int h, uint8_t keep) {
   h = (h + 1536) % 1536;
   if (h < 256) return rgbl(p, h, 255, 0, keep);
   if ((h -= 256) < 256) return rgbl(p, 255, 255-h, 0, keep);
@@ -83,84 +88,105 @@ void hue(int p, int h, uint8_t keep) {
   if ((h -= 256) < 256) return rgbl(p, 0, 255, 255-h, keep);
 }
 
-void intHandler(int dummy) {
+static void msleep(int delay) {
+  select(0, NULL, NULL, NULL, &(struct timeval){
+    .tv_sec = delay / 1000,
+    .tv_usec = (delay % 1000) * 1000
+  });
+}
+
+static int get_width() { return width; }
+static int get_height() { return height; }
+static int get_alive() { return alive; }
+
+static void *my_dlsym(void *handle, const char *name) {
+  if (strcmp(name, "rand") == 0) return rand;
+  if (strcmp(name, "srand") == 0) return srand;
+  if (strcmp(name, "fade") == 0) return fade;
+  if (strcmp(name, "update") == 0) return update;
+  if (strcmp(name, "rgb") == 0) return rgb;
+  if (strcmp(name, "rgbl") == 0) return rgbl;
+  if (strcmp(name, "hue") == 0) return hue;
+  if (strcmp(name, "msleep") == 0) return msleep;
+  if (strcmp(name, "get_alive") == 0) return get_alive;
+  if (strcmp(name, "get_width") == 0) return get_width;
+  if (strcmp(name, "get_height") == 0) return get_height;
+  return NULL;
+  (void) handle;
+}
+
+
+static void intHandler(int dummy) {
   alive = 0;
+  printf("\e[?25h\n");
 }
-typedef struct {
-  int x;
-  int y;
-  int d;
-  int h;
-  int l;
-} bug_t;
 
-void init_bug(bug_t* bug) {
-  bug->x = rand() % width;
-  bug->y = rand() % height;
-  bug->d = rand() % 4;
-  bug->h = rand() % 1536;
-  bug->l = rand() % 1500;
-}
-void update_bug(bug_t* bug) {
-  switch(bug->d) {
-    case 0: bug->x = (bug->x + width - 1) % width; break;
-    case 1: bug->y = (bug->y + height - 1) % height; break;
-    case 2: bug->x = (bug->x + 1) % width; break;
-    case 3: bug->y = (bug->y + 1) % height; break;
+static buffer_t read_stdin() {
+  // Read from stdin to a buffer.
+  buffer_t buf = buffer_create(1024);
+  size_t length = 0;
+  while (true) {
+    ssize_t b = read(0, buf.data + length, buf.len - length);
+    if (b < 0) {
+      printf("Problem reading stdin");
+      exit(-1);
+    }
+    length += b;
+    if (b < 1024) break;
+    buffer_resize(&buf, buf.len + 1024);
   }
-  bug->h = (bug->h + 13) % 1536;
-  if (bug->l < 0 || (bug->l % 2) == 0) bug->d = (bug->d + (rand() % 2) * 2 + 3) % 4;
-  int p = bug->y * width + bug->x;
-  hue(p, bug->h, 255);
-  if (!--bug->l) {
-    // for (int i = 0; i < 50; i++) {
-    //   update_bug(bug);
-    // }
-    // printf("\a");
-    // int b = 255;
-    // for (int i = 1; i < 5; i++) {
-    //   b = b * 210 >> 8;
-    //   hue(p + i, bug->h, b);
-    //   hue(p - i, bug->h, b);
-    //   hue(p + i * width, bug->h, b);
-    //   hue(p - i * width, bug->h, b);
-    //   bug->h += 51;
-    //   b = b * 210 >> 8;
-    //   hue(p + i * (width + 1), bug->h, b);
-    //   hue(p + i * (width - 1), bug->h, b);
-    //   hue(p - i * (width + 1), bug->h, b);
-    //   hue(p - i * (width - 1), bug->h, b);
-    // }
-    init_bug(bug);
-  }
-
+  buffer_resize(&buf, length);
+  return buf;
 }
-
-#define NUM_BUGS 1
 
 int main() {
-  bug_t bugs[NUM_BUGS];
-  for (int i = 0; i < NUM_BUGS; i++) {
-    init_bug(bugs + i);
+  struct winsize sz;
+  ioctl(1, TIOCGWINSZ, &sz);
+  width = sz.ws_col;
+  height = sz.ws_row * 2;
+  count = width * height;
+  pixels = malloc(count * 3);
+
+  buffer_t code = read_stdin();
+
+  struct mjs *mjs = mjs_create();
+
+  // Register library functions
+  mjs_set_ffi_resolver(mjs, my_dlsym);
+  mjs_err_t err = mjs_exec(mjs,
+    "let getWidth = ffi('int get_width()');"
+    "let getHeight = ffi('int get_height()');"
+    "let getAlive = ffi('int get_alive()');"
+    "let rand = ffi('int rand()');"
+    "let srand = ffi('void srand(int)');"
+    "let fade = ffi('void fade(int)');"
+    "let update = ffi('void update()');"
+    "let rgb = ffi('void rgb(int, int, int, int)');"
+    "let rgbl = ffi('void rgbl(int, int, int, int, int)');"
+    "let hue = ffi('void hue(int, int, int)');"
+    "let msleep = ffi('void msleep(int)');"
+  , NULL);
+  if (err != MJS_OK) {
+    printf("%s\n",mjs_strerror(mjs, err));
+    return -1;
   }
+
   // Clear screen and hide cursor
   printf("\e[2J\e[?25l");
   // Register sigint handler
   signal(SIGINT, intHandler);
 
-  while (alive) {
-    fade(250);
-    for (int i = 0; i < NUM_BUGS; i++) {
-      update_bug(bugs + i);
-      update_bug(bugs + i);
-      update_bug(bugs + i);
-      update_bug(bugs + i);
-      update_bug(bugs + i);
-    }
-    update();
-    usleep(1000*16);
-  }
+  // Run user program
+  err = mjs_exec_buf(mjs, (char*)code.data, code.len, NULL);
+
   // Show cursor again
   printf("\e[?25h\n");
+
+  // Handle any user error
+  if (err != MJS_OK) {
+    printf("%s\n",mjs_strerror(mjs, err));
+    return -1;
+  }
+
   return 0;
 }
